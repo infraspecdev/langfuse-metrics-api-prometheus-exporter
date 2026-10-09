@@ -1,0 +1,22 @@
+receivers:
+  prometheus/langfuse:
+    config:
+      scrape_configs:
+        - job_name: langfuse-metrics-api
+          scrape_interval: 60s
+          static_configs:
+            - targets: ["langfuse-metrics-api-exporter.langfuse.svc.cluster.local:9464"]
+
+processors:
+  batch: {}
+
+exporters:
+  otlp:
+    endpoint: <your-otlp-backend>:4317
+
+service:
+  pipelines:
+    metrics/langfuse:
+      receivers: [prometheus/langfuse]
+      processors: [batch]
+      exporters: [otlp]

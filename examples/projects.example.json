@@ -1,0 +1,4 @@
+[
+  {"name": "chatbot", "public_key": "pk-lf-...", "secret_key": "sk-lf-..."},
+  {"name": "search-assistant", "public_key": "pk-lf-...", "secret_key": "sk-lf-..."}
+]

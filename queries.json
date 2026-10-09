@@ -1,0 +1,127 @@
+{
+  "queries": [
+    {
+      "key": "observations",
+      "description": "Volume and errors: every observation (AGENT, GENERATION, TOOL, SPAN...) by step and level.",
+      "view": "observations",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "traceName", "label": "trace_name"},
+        {"field": "type", "label": "observation_type"},
+        {"field": "name", "label": "observation_name"},
+        {"field": "level", "label": "level"}
+      ],
+      "filters": [],
+      "metrics": [
+        {"aggregation": "count", "measure": "count", "name": "langfuse_observations", "help": "Observations started in the window."}
+      ]
+    },
+    {
+      "key": "latency",
+      "description": "Latency per step. No level dimension, so each percentile covers every observation of that step.",
+      "view": "observations",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "traceName", "label": "trace_name"},
+        {"field": "type", "label": "observation_type"},
+        {"field": "name", "label": "observation_name"}
+      ],
+      "filters": [],
+      "metrics": [
+        {"aggregation": "avg", "measure": "latency", "name": "langfuse_observation_latency_avg_ms", "help": "Average observation latency in ms."},
+        {"aggregation": "p50", "measure": "latency", "name": "langfuse_observation_latency_p50_ms", "help": "Median observation latency in ms."},
+        {"aggregation": "p95", "measure": "latency", "name": "langfuse_observation_latency_p95_ms", "help": "p95 observation latency in ms."},
+        {"aggregation": "p99", "measure": "latency", "name": "langfuse_observation_latency_p99_ms", "help": "p99 observation latency in ms."}
+      ]
+    },
+    {
+      "key": "generations",
+      "description": "LLM calls only, so model is always set. Cost is 0 for models Langfuse has no price for; time to first token appears only for streaming calls.",
+      "view": "observations",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "traceName", "label": "trace_name"},
+        {"field": "providedModelName", "label": "model"}
+      ],
+      "filters": [
+        {"column": "type", "operator": "=", "value": "GENERATION", "type": "string"}
+      ],
+      "metrics": [
+        {"aggregation": "sum", "measure": "inputTokens", "name": "langfuse_input_tokens", "help": "Input tokens used in the window."},
+        {"aggregation": "sum", "measure": "outputTokens", "name": "langfuse_output_tokens", "help": "Output tokens used in the window."},
+        {"aggregation": "sum", "measure": "totalTokens", "name": "langfuse_total_tokens", "help": "Total tokens used in the window."},
+        {"aggregation": "sum", "measure": "inputCost", "name": "langfuse_input_cost_usd", "help": "Input cost in USD in the window."},
+        {"aggregation": "sum", "measure": "outputCost", "name": "langfuse_output_cost_usd", "help": "Output cost in USD in the window."},
+        {"aggregation": "sum", "measure": "totalCost", "name": "langfuse_total_cost_usd", "help": "Total cost in USD in the window."},
+        {"aggregation": "sum", "measure": "latency", "name": "langfuse_generation_latency_sum_ms", "help": "Summed LLM call time in ms; output_tokens / (this / 1000) is output tokens/sec."},
+        {"aggregation": "avg", "measure": "tokensPerSecond", "name": "langfuse_tokens_per_second_avg", "help": "Average (input + output) tokens per second of LLM call time."},
+        {"aggregation": "avg", "measure": "outputTokensPerSecond", "name": "langfuse_output_tokens_per_second_avg", "help": "Average output tokens per second after the first token (streaming only)."},
+        {"aggregation": "p50", "measure": "timeToFirstToken", "name": "langfuse_time_to_first_token_p50_ms", "help": "Median time to first token in ms (streaming only)."},
+        {"aggregation": "p95", "measure": "timeToFirstToken", "name": "langfuse_time_to_first_token_p95_ms", "help": "p95 time to first token in ms (streaming only)."}
+      ]
+    },
+    {
+      "key": "traces",
+      "description": "Root observations stand in for traces, which v2 has no view for.",
+      "view": "observations",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "traceName", "label": "trace_name"},
+        {"field": "level", "label": "level"}
+      ],
+      "filters": [
+        {"column": "isRootObservation", "operator": "=", "value": true, "type": "boolean"}
+      ],
+      "metrics": [
+        {"aggregation": "count", "measure": "count", "name": "langfuse_traces", "help": "Traces (root observations) started in the window."},
+        {"aggregation": "p50", "measure": "latency", "name": "langfuse_trace_latency_p50_ms", "help": "Median end-to-end trace latency in ms."},
+        {"aggregation": "p95", "measure": "latency", "name": "langfuse_trace_latency_p95_ms", "help": "p95 end-to-end trace latency in ms."}
+      ]
+    },
+    {
+      "key": "scores_numeric",
+      "description": "The scores-numeric view also holds boolean scores; the filter leaves those to scores_boolean.",
+      "view": "scores-numeric",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "name", "label": "score_name"},
+        {"field": "source", "label": "score_source"}
+      ],
+      "filters": [
+        {"column": "dataType", "operator": "=", "value": "NUMERIC", "type": "string"}
+      ],
+      "metrics": [
+        {"aggregation": "count", "measure": "count", "name": "langfuse_numeric_scores", "help": "Numeric scores recorded in the window."},
+        {"aggregation": "avg", "measure": "value", "name": "langfuse_numeric_score_avg", "help": "Average numeric score value."}
+      ]
+    },
+    {
+      "key": "scores_boolean",
+      "view": "scores-boolean",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "name", "label": "score_name"},
+        {"field": "source", "label": "score_source"}
+      ],
+      "filters": [],
+      "metrics": [
+        {"aggregation": "count", "measure": "count", "name": "langfuse_boolean_scores", "help": "Boolean scores recorded in the window."},
+        {"aggregation": "avg", "measure": "value", "name": "langfuse_boolean_score_true_ratio", "help": "Share of boolean scores that are true (0-1)."}
+      ]
+    },
+    {
+      "key": "scores_categorical",
+      "view": "scores-categorical",
+      "dimensions": [
+        {"field": "environment", "label": "environment"},
+        {"field": "name", "label": "score_name"},
+        {"field": "source", "label": "score_source"},
+        {"field": "stringValue", "label": "score_value"}
+      ],
+      "filters": [],
+      "metrics": [
+        {"aggregation": "count", "measure": "count", "name": "langfuse_categorical_scores", "help": "Categorical scores recorded in the window, by value."}
+      ]
+    }
+  ]
+}

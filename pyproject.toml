@@ -1,0 +1,17 @@
+[project]
+name = "langfuse-metrics-api-prometheus-exporter"
+version = "0.1.0"
+description = "Prometheus exporter for the Langfuse Metrics API"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

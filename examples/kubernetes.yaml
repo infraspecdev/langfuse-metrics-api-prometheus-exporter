@@ -1,0 +1,79 @@
+# kubectl -n langfuse create secret generic langfuse-metrics-api-exporter \
+#   --from-file=projects.json=./projects.json
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-metrics-api-exporter
+  namespace: langfuse
+  labels:
+    app.kubernetes.io/name: langfuse-metrics-api-exporter
+spec:
+  selector:
+    app.kubernetes.io/name: langfuse-metrics-api-exporter
+  ports:
+    - name: metrics
+      port: 9464
+      targetPort: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-metrics-api-exporter
+  namespace: langfuse
+  labels:
+    app.kubernetes.io/name: langfuse-metrics-api-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: langfuse-metrics-api-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: langfuse-metrics-api-exporter
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: exporter
+          image: akshayakz2004/langfuse-metrics-api-prometheus-exporter:0.1.0
+          env:
+            - name: LANGFUSE_HOST
+              value: http://langfuse-web.langfuse.svc.cluster.local:3000
+            - name: WINDOWS
+              value: "3600,86400"
+            - name: REFRESH_SECONDS
+              value: "60"
+          ports:
+            - name: metrics
+              containerPort: 9464
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: projects
+              mountPath: /etc/langfuse-exporter
+              readOnly: true
+      volumes:
+        - name: projects
+          secret:
+            secretName: langfuse-metrics-api-exporter

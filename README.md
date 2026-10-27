@@ -75,11 +75,8 @@ it over this exporter.
 
 ## How it works
 
-```
-                  every REFRESH_SECONDS                      scrape
-Langfuse  ◀──── GET /api/public/v2/metrics ────  exporter  ◀──────────  Prometheus / OTel Collector
-          ────────────── JSON ─────────────────▶   :9464
-```
+<img width="2792" height="494" alt="image" src="https://github.com/user-attachments/assets/1b2f19d5-624c-41f0-868b-238baa9b22da" />
+
 
 Every `REFRESH_SECONDS`, the exporter runs each query in `queries.json` for each project
 and each window in `WINDOWS`, converts the rows into Prometheus gauges and caches them.

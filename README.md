@@ -29,11 +29,35 @@ about the Langfuse service itself, such as queue length.
 
 ## Why
 
-The Langfuse Metrics API answers JSON queries over a time range. Prometheus and the
-OpenTelemetry Collector can only scrape metrics, so they can't read it, and Langfuse has
-no Prometheus endpoint ([langfuse#2508](https://github.com/orgs/langfuse/discussions/2508),
-[langfuse#3551](https://github.com/orgs/langfuse/discussions/3551)). This exporter
-bridges the two.
+Langfuse computes cost, token usage, latency and evaluation scores from your traces, and
+the [Metrics API](https://langfuse.com/docs/metrics/features/metrics-api) is the only way
+to read those numbers programmatically. The API doesn't speak a format that Prometheus or
+the OpenTelemetry Collector accepts:
+
+- **Every request needs a query.** The caller sends a JSON query that says what to group
+  by, what to aggregate and which time range to cover. A Prometheus scrape is a plain
+  `GET /metrics` with no parameters and no time range.
+- **The response is JSON rows.** Results come back as rows such as
+  `{"providedModelName": "gpt-4o", "sum_totalCost": 0.4213}`. Prometheus, and the
+  Collector's Prometheus receiver, expect the
+  [Prometheus text format](https://prometheus.io/docs/instrumenting/exposition_formats/):
+  one line per sample with a metric name, labels and a value, such as
+  `langfuse_total_cost_usd{model="gpt-4o"} 0.4213`.
+- **Every request needs project credentials.** The API uses Basic auth with the key pair
+  of one Langfuse project. Scrape targets usually need no auth.
+
+Langfuse also doesn't push these metrics out over OTLP (it accepts OpenTelemetry traces as
+input, but doesn't export metrics), and it has no Prometheus endpoint. So neither
+Prometheus nor the Collector can collect them on its own.
+
+This exporter sits in between. It runs the queries on a schedule for each project,
+converts the rows into Prometheus gauges and serves them on `/metrics`, where Prometheus
+or the Collector can scrape them like any other target.
+
+Native Prometheus support for Langfuse is requested in
+[langfuse#2508](https://github.com/orgs/langfuse/discussions/2508) and
+[langfuse#3551](https://github.com/orgs/langfuse/discussions/3551). If it ships, prefer
+it over this exporter.
 
 ## Features
 

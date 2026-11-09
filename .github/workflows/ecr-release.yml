@@ -1,0 +1,81 @@
+name: ecr-release
+
+# On a vX.Y.Z Git tag: adds that tag to the image ecr-image.yml already built for the tagged commit
+# (sha-<short commit>), so the release is exactly the tested image, with the same digest. Nothing is rebuilt.
+# Fails if the commit was never built on main. Uses the same OIDC push role, which trusts refs/tags/v*.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# The ECR repository and its push role (cloud-infrastructure/core/ecr/workload-images). Not secrets: the
+# role trusts only this repository's main branch and v* tags (GitHub OIDC), so they are written here.
+env:
+  ECR_REPOSITORY_URL: 533267412035.dkr.ecr.ap-south-1.amazonaws.com/langfuse-metrics-api-prometheus-exporter
+  ECR_PUSH_ROLE_ARN: arn:aws:iam::533267412035:role/langfuse-metrics-api-prometheus-exporter-ecr-push-gh-role
+
+jobs:
+  release:
+    name: Tag the built image as the release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write # assume the ECR push role via OIDC
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Check the version
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$VERSION is not a release tag (vMAJOR.MINOR.PATCH, e.g. v1.4.2)"; exit 1
+          fi
+      # Resolves the commit the tag points to, also for annotated tags.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.ECR_PUSH_ROLE_ARN }}
+          aws-region: ap-south-1
+      # Only batch-get-image and put-image: the push role may read images and add tags, not describe them.
+      - name: Add the release tag to the built image
+        run: |
+          repo="${ECR_REPOSITORY_URL#*/}"
+          commit="$(git rev-parse HEAD)"
+          source="sha-${commit::7}"
+
+          # get_image TAG: the image's JSON (manifest, media type, digest), or null if the tag doesn't exist
+          get_image() {
+            aws ecr batch-get-image --repository-name "$repo" --image-ids imageTag="$1" \
+              --accepted-media-types application/vnd.oci.image.index.v1+json \
+                application/vnd.docker.distribution.manifest.list.v2+json \
+                application/vnd.oci.image.manifest.v1+json \
+                application/vnd.docker.distribution.manifest.v2+json \
+              --query 'images[0]' --output json
+          }
+
+          image="$(get_image "$source")"
+          if [ "$image" = "null" ]; then
+            echo "::error::$repo:$source not found: was commit $commit built on main? Push it to main first."; exit 1
+          fi
+          want="$(jq -r .imageId.imageDigest <<<"$image")"
+
+          # Safe to re-run: an existing release tag is fine if it already points to this image.
+          existing="$(get_image "$VERSION")"
+          if [ "$existing" = "null" ]; then
+            aws ecr put-image --repository-name "$repo" --image-tag "$VERSION" \
+              --image-manifest "$(jq -r .imageManifest <<<"$image")" \
+              --image-manifest-media-type "$(jq -r .imageManifestMediaType <<<"$image")" >/dev/null
+          fi
+
+          got="$(get_image "$VERSION" | jq -r .imageId.imageDigest)"
+          {
+            echo "### Released"
+            echo '```'
+            echo "$repo:$VERSION -> $got (same image as $source)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$got" = "$want" ] || { echo "::error::$VERSION has digest $got, expected $want"; exit 1; }
